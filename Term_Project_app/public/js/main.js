@@ -378,37 +378,6 @@ async function applyFilter() {
   }
 }
 
-async function showNearbyFoodie() {
-  if (!originCoords) {
-    alert('먼저 출발지를 설정하세요.');
-    return;
-  }
-  try {
-    const url = new URL('/api/foodie/nearby', window.location.origin);
-    url.searchParams.append('x', originCoords.x);
-    url.searchParams.append('y', originCoords.y);
-    url.searchParams.append('radius', 1000);
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`API 응답 상태 ${res.status}`);
-    const data = await res.json();
-    clearMarkers();
-    const originLatLng = new kakao.maps.LatLng(originCoords.y, originCoords.x);
-    addSimpleMarker(originLatLng, '출발지');
-    data.forEach(item => {
-      const lat = parseFloat(item.lat ?? item.LAT ?? item.RSTR_LA);
-      const lon = parseFloat(item.lng ?? item.LNG ?? item.RSTR_LO);
-      if (!isNaN(lat) && !isNaN(lon)) {
-        const latlng = new kakao.maps.LatLng(lat, lon);
-        const title = item.name || item.MAIN_TITLE || item.RSTR_NM || '추천 장소';
-        addRestaurantMarker(latlng, title, item);
-      }
-    });
-  } catch (err) {
-    console.error(err);
-    alert('주변 길거리 음식/카페 조회 오류: ' + err.message);
-  }
-}
-
 async function fetchRouteAndDraw(originCoords, destCoords, destName) {
   const body = {
     origin: originCoords,
@@ -625,5 +594,4 @@ window.onload = () => {
   document.getElementById('viewportBtn')?.addEventListener('click', () => searchInViewport(false));
   document.getElementById('autoViewport')?.addEventListener('change', e => { if (e.target.checked) searchInViewport(true); });
   setupViewportAutoSearch();
-  document.getElementById('showFoodieBtn')?.addEventListener('click', showNearbyFoodie);
 };

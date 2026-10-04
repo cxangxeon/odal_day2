@@ -30,10 +30,6 @@ app.use('/api/geocode', geocodeRouter);
 app.use('/api/restaurants', restaurantRouter);
 app.use('/api/route', routeRouter);
 
-// 기타 필요 라우트: /api/nearby-foodie 등
-import foodieRouter from './routes/foodie.js';
-app.use('/api/foodie', foodieRouter);
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

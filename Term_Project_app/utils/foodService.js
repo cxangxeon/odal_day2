@@ -4,11 +4,9 @@ import './loadEnv.js';
 import { callPublicApi } from './publicApi.js';
 
 const FOOD_SERVICE_KEY = process.env.BUSAN_FOOD_SERVICE_KEY;
-const FOODIE_SERVICE_KEY = process.env.BUSAN_FOODIE_SERVICE_KEY;
 
 // 기본 엔드포인트 (HTTP; 필요 시 HTTPS로 변경)
 const FOOD_SERVICE_URL = 'http://apis.data.go.kr/6260000/FoodService/getFoodKr';
-const FOODIE_SERVICE_URL = 'http://apis.data.go.kr/6260000/FoodieService/getFoodieKr';
 
 /**
  * 주변 맛집 호출: fetchNearbyFoodService(x, y, radius)
@@ -68,28 +66,6 @@ export async function fetchFoodInBounds({ swLat, swLng, neLat, neLng }) {
   const r = all.filter(it => it.lat >= swLat && it.lat <= neLat && it.lng >= swLng && it.lng <= neLng);
   console.log(`[fetchFoodInBounds] 화면 영역: ${all.length} -> ${r.length}`);
   return r;
-}
-
-/**
- * 주변 부산푸디투어정보 조회
- * 구조와 로직은 fetchNearbyFoodService와 유사
- */
-export async function fetchNearbyFoodieService(x, y, radius) {
-  const url = new URL(FOODIE_SERVICE_URL);
-  url.searchParams.append('ServiceKey', FOODIE_SERVICE_KEY);
-  url.searchParams.append('pageNo', '1');
-  url.searchParams.append('numOfRows', '1000');
-  url.searchParams.append('resultType', 'json');
-
-  const data = await callPublicApi(url, 'fetchNearbyFoodieService');
-  // 응답 구조: getFoodieKr.item 또는 response.body.items.item
-  const raw = data.getFoodieKr?.item ?? data.response?.body?.items?.item ?? [];
-  const items = Array.isArray(raw) ? raw : [raw];
-  const normalized = items.map(normalizeFoodItem).filter(it => it.lat != null && it.lng != null);
-  if (radius != null && !isNaN(radius)) {
-    return normalized.filter(it => haversineDistance(y, x, it.lat, it.lng) <= radius);
-  }
-  return normalized;
 }
 
 /**

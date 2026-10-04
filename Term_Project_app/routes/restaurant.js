@@ -1,6 +1,6 @@
 // routes/restaurant.js
 import express from 'express';
-import { fetchNearbyFoodService, fetchFoodInBounds, fetchNearbyFoodieService, matchesCategory, matchesPrice, extractMinPrice } from '../utils/foodService.js';
+import { fetchNearbyFoodService, fetchFoodInBounds, matchesCategory, matchesPrice, extractMinPrice } from '../utils/foodService.js';
 
 const router = express.Router();
 
@@ -36,40 +36,6 @@ router.get('/nearby', async (req, res) => {
   } catch (err) {
     console.error('[restaurant] 주변 맛집 조회 실패:', err);
     return res.status(500).json({ error: '주변 맛집 조회 실패', details: err.message });
-  }
-});
-
-/**
- * GET /api/restaurants/foodie?x=경도&y=위도&radius=반경(미터)
- * 주변 부산푸디투어정보 서비스 API 호출 (추천 정보 강조)
- */
-router.get('/foodie', async (req, res) => {
-  try {
-    const { x, y, radius } = req.query;
-    console.log('[restaurant] /foodie 호출, req.query=', req.query);
-    if (!x || !y) {
-      return res.status(400).json({ error: 'x, y 쿼리 필요' });
-    }
-    const lon = Number(x), lat = Number(y);
-    if (isNaN(lon) || isNaN(lat)) {
-      return res.status(400).json({ error: '유효하지 않은 x,y 값' });
-    }
-    const r = radius ? Number(radius) : undefined;
-    const list = await fetchNearbyFoodieService(lon, lat, r);
-
-    // 콘솔에 길이와 일부 항목만 찍기
-    if (Array.isArray(list)) {
-      console.log(`[restaurant] fetchNearbyFoodieService 결과 개수: ${list.length}`);
-      const sample = list.slice(0, 5);
-      console.log('[restaurant] foodie 결과 예시(최대 5개):', sample);
-    } else {
-      console.log('[restaurant] fetchNearbyFoodieService 반환값이 배열이 아님:', list);
-    }
-
-    return res.json(list);
-  } catch (err) {
-    console.error('[restaurant] 부산푸디투어정보 조회 실패:', err);
-    return res.status(500).json({ error: '부산푸디투어정보 조회 실패', details: err.message });
   }
 });
 
