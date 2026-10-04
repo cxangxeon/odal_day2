@@ -1,7 +1,7 @@
 // utils/foodService.js
 import fetch from 'node-fetch';
-import dotenv from 'dotenv';
-dotenv.config();
+import './loadEnv.js';
+import { callPublicApi } from './publicApi.js';
 
 const FOOD_SERVICE_KEY = process.env.BUSAN_FOOD_SERVICE_KEY;
 const FOODIE_SERVICE_KEY = process.env.BUSAN_FOODIE_SERVICE_KEY;
@@ -22,108 +22,52 @@ const FOODIE_SERVICE_URL = 'http://apis.data.go.kr/6260000/FoodieService/getFood
  * 주의: 전체 데이터를 매번 가져오는 것은 비효율. 실제론 서버 사이드에 인메모리 캐싱,
  * 혹은 주기적으로 전체 데이터를 가져와 로컬 DB에 저장 후 검색 시 DB 쿼리로 처리하는 방식을 추천.
  */
-export async function fetchNearbyFoodService(x, y, radius) {
-  console.log(`[fetchNearbyFoodService] 호출: x=${x}, y=${y}, radius=${radius}`);
-  if (!FOOD_SERVICE_KEY) {
-    console.error('[fetchNearbyFoodService] 환경변수 BUSAN_FOOD_SERVICE_KEY가 설정되지 않았습니다.');
-    throw new Error('FOOD_SERVICE_KEY 미설정');
-  }
+let foodCache = { at: 0, items: null };
+const FOOD_CACHE_MS = 60 * 60 * 1000; // 1시간 (지도 이동마다 공공API를 호출하지 않도록)
 
-  // 1) API 호출 URL 생성
+async function getAllFoodItems() {
+  if (foodCache.items && Date.now() - foodCache.at < FOOD_CACHE_MS) return foodCache.items;
+  if (!FOOD_SERVICE_KEY) {
+    throw new Error('BUSAN_FOOD_SERVICE_KEY 미설정');
+  }
   const url = new URL(FOOD_SERVICE_URL);
-  // 공공데이터포털 문서에 명시된 파라미터명 대소문자 주의
   url.searchParams.append('ServiceKey', FOOD_SERVICE_KEY);
   url.searchParams.append('pageNo', '1');
   url.searchParams.append('numOfRows', '1000');
   url.searchParams.append('resultType', 'json');
-  console.log('[fetchNearbyFoodService] 요청 URL:', url.toString());
 
-  // 2) API 호출
-  let res;
-  try {
-    res = await fetch(url.toString());
-  } catch (networkErr) {
-    console.error('[fetchNearbyFoodService] 네트워크 에러:', networkErr);
-    throw new Error('공공데이터 API 호출 중 네트워크 오류');
-  }
-  console.log('[fetchNearbyFoodService] 응답 상태 코드:', res.status);
-  if (!res.ok) {
-    let text;
-    try {
-      text = await res.text();
-    } catch (_) {
-      text = '<본문 파싱 실패>';
-    }
-    console.error('[fetchNearbyFoodService] 오류 응답 본문:', text);
-    throw new Error(`부산맛집정보 API 오류: ${res.status}`);
-  }
-
-  // 3) JSON 파싱
-  let data;
-  try {
-    data = await res.json();
-  } catch (parseErr) {
-    console.error('[fetchNearbyFoodService] JSON 파싱 실패:', parseErr);
-    throw new Error('공공데이터 API 응답 JSON 파싱 실패');
-  }
-
-  // 4) 최상위 getFoodKr 객체 접근 및 헤더 확인
+  const data = await callPublicApi(url, 'getFoodKr');
   const responseObj = data.getFoodKr;
-  if (!responseObj) {
-    console.warn('[fetchNearbyFoodService] data.getFoodKr가 없습니다. 전체 응답:', data);
-    return []; // 혹은 throw new Error(...)
-  }
+  if (!responseObj) throw new Error('getFoodKr 응답 구조가 예상과 다릅니다');
   const header = responseObj.header;
   if (!header || header.code !== '00') {
-    console.error('[fetchNearbyFoodService] API 응답 헤더 에러:', header);
     throw new Error(`API 응답 에러 코드: ${header?.code}, 메시지: ${header?.message}`);
   }
+  const raw = responseObj.item;
+  const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const normalized = items.map(normalizeFoodItem).filter(it => it.lat != null && it.lng != null);
+  console.log(`[getFoodKr] 전체 ${items.length}곳 로드 (좌표 유효 ${normalized.length}곳) - 1시간 캐시`);
+  foodCache = { at: Date.now(), items: normalized };
+  return normalized;
+}
 
-  // 5) items 배열화
-  const rawItems = responseObj.item;
-  // responseObj.item이 배열인지 단일 객체인지 확인
-  let items;
-  if (Array.isArray(rawItems)) {
-    items = rawItems;
-  } else if (rawItems) {
-    // 단일 객체로 올 경우
-    items = [rawItems];
-  } else {
-    items = [];
+/** 출발지 기준 반경(m) 내 맛집 */
+export async function fetchNearbyFoodService(x, y, radius) {
+  const all = await getAllFoodItems();
+  if (radius != null && !isNaN(radius)) {
+    const r = all.filter(it => haversineDistance(y, x, it.lat, it.lng) <= radius);
+    console.log(`[fetchNearbyFoodService] 반경 ${radius}m: ${all.length} -> ${r.length}`);
+    return r;
   }
-  console.log('[fetchNearbyFoodService] items.length =', items.length);
-  if (items.length > 0) {
-    console.log('[fetchNearbyFoodService] items[0] 샘플:', items[0]);
-  }
+  return all;
+}
 
-  // // 6) 반경 필터링: 위도/경도 필드는 item.LAT, item.LNG
-  // if (radius != null) {
-  //   const beforeCount = items.length;
-  //   const filtered = items.filter(item => {
-  //     const latVal = item.LAT;
-  //     const lngVal = item.LNG;
-  //     if (latVal == null || lngVal == null) {
-  //       console.warn('[fetchNearbyFoodService] LAT/LNG 필드 누락 아이템:', item);
-  //       return false;
-  //     }
-  //     const lat = parseFloat(latVal);
-  //     const lon = parseFloat(lngVal);
-  //     if (isNaN(lat) || isNaN(lon)) {
-  //       console.warn('[fetchNearbyFoodService] LAT/LNG 파싱 실패(item):', item);
-  //       return false;
-  //     }
-  //     const d = haversineDistance(y, x, lat, lon);
-  //     return d <= radius;
-  //   });
-  //   console.log(`[fetchNearbyFoodService] 반경 필터링 전 count=${beforeCount}, 후 count=${filtered.length}`);
-  //   if (filtered.length > 0) {
-  //     console.log('[fetchNearbyFoodService] 필터링된 첫 3개 샘플:', filtered.slice(0, 3));
-  //   }
-  //   return filtered;
-  // }
-
-  // radius 미지정 시 전체 반환
-  return items;
+/** 지도 화면(남서~북동 좌표) 안의 맛집 */
+export async function fetchFoodInBounds({ swLat, swLng, neLat, neLng }) {
+  const all = await getAllFoodItems();
+  const r = all.filter(it => it.lat >= swLat && it.lat <= neLat && it.lng >= swLng && it.lng <= neLng);
+  console.log(`[fetchFoodInBounds] 화면 영역: ${all.length} -> ${r.length}`);
+  return r;
 }
 
 /**
@@ -137,23 +81,15 @@ export async function fetchNearbyFoodieService(x, y, radius) {
   url.searchParams.append('numOfRows', '1000');
   url.searchParams.append('resultType', 'json');
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`부산푸디투어정보 API 오류: ${res.status}`);
+  const data = await callPublicApi(url, 'fetchNearbyFoodieService');
+  // 응답 구조: getFoodieKr.item 또는 response.body.items.item
+  const raw = data.getFoodieKr?.item ?? data.response?.body?.items?.item ?? [];
+  const items = Array.isArray(raw) ? raw : [raw];
+  const normalized = items.map(normalizeFoodItem).filter(it => it.lat != null && it.lng != null);
+  if (radius != null && !isNaN(radius)) {
+    return normalized.filter(it => haversineDistance(y, x, it.lat, it.lng) <= radius);
   }
-  const data = await res.json();
-  const items = data.response?.body?.items?.item || [];
-  if (radius != null) {
-    return items.filter(item => {
-      if (!item.LAT || !item.LNG) return false;
-      const lat = parseFloat(item.LAT);
-      const lon = parseFloat(item.LNG);
-      const d = haversineDistance(y, x, lat, lon);
-      return d <= radius;
-    });
-  } else {
-    return items;
-  }
+  return normalized;
 }
 
 /**
@@ -173,4 +109,72 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const d = R * c;
   return d;
+}
+
+
+/**
+ * API마다 다른 필드명을 통일한다.
+ *  - 부산맛집(getFoodKr): LAT, LNG, MAIN_TITLE, RPRSNTV_MENU ...
+ *  - 구버전 필드: RSTR_LA, RSTR_LO, RSTR_NM ...
+ */
+export function normalizeFoodItem(item) {
+  const lat = parseFloat(item.LAT ?? item.RSTR_LA);
+  const lng = parseFloat(item.LNG ?? item.RSTR_LO);
+  const name = item.MAIN_TITLE || item.RSTR_NM || item.TITLE || item.PLACE || '맛집';
+  const searchText = [
+    item.MAIN_TITLE, item.TITLE, item.SUBTITLE, item.PLACE, item.RPRSNTV_MENU,
+    item.ITEMCNTNTS, item.BSNS_STATM_BZCND_NM, item.RSTR_INTRCN_CONT, item.FOOD_CATEGORY,
+  ].filter(Boolean).join(' ');
+  return {
+    ...item,
+    lat: isNaN(lat) ? null : lat,
+    lng: isNaN(lng) ? null : lng,
+    name,
+    searchText,
+  };
+}
+
+// ---------- 음식 종류 분류 ----------
+// API에 분류 필드가 없어서 "가게명 + 대표메뉴"로 추정한다. (설명문은 오분류가 많아 제외)
+const CATEGORY_KEYWORDS = {
+  '카페': ['카페', '커피', '디저트', '베이커리', '케이크', '찻집', '라떼', '빙수', '제과', '마카롱'],
+  '일식': ['일식', '초밥', '스시', '라멘', '우동', '돈까스', '돈가스', '사시미', '오마카세', '덮밥', '소바', '이자카야', '가라아게'],
+  '중식': ['중식', '중국', '짜장', '짬뽕', '탕수육', '마라', '딤섬', '양꼬치', '훠궈'],
+  '양식': ['양식', '파스타', '피자', '스테이크', '햄버거', '버거', '브런치', '리조또', '샐러드', '샌드위치'],
+};
+
+export function classifyItem(item) {
+  const core = [item.MAIN_TITLE, item.TITLE, item.RPRSNTV_MENU].filter(Boolean).join(' ');
+  for (const cat of ['카페', '일식', '중식', '양식']) {
+    if (CATEGORY_KEYWORDS[cat].some(k => core.includes(k))) return cat;
+  }
+  return '한식'; // 부산 로컬 맛집 데이터 특성상 나머지는 한식으로 분류
+}
+
+export function matchesCategory(item, category) {
+  if (!category) return true;
+  return classifyItem(item) === category;
+}
+
+// ---------- 가격대 ----------
+// RPRSNTV_MENU 의 "￦9,000", "9,000원" 같은 표기에서 최저가를 추출
+export function extractMinPrice(item) {
+  const text = item.RPRSNTV_MENU || '';
+  const prices = [];
+  for (const m of text.matchAll(/[￦₩]\s*([\d,]{3,})(?:\s*[-~]\s*([\d,]{3,}))?|([\d,]{4,})\s*원/g)) {
+    const v = parseInt((m[1] || m[3]).replace(/,/g, ''), 10);
+    if (!isNaN(v)) prices.push(v);
+  }
+  return prices.length ? Math.min(...prices) : null;
+}
+
+// 저렴: 1만원 이하 / 중간: 1~2만원 / 고급: 2만원 초과 (가격 정보 없는 가게는 제외)
+export function matchesPrice(item, price) {
+  if (!price) return true;
+  const p = extractMinPrice(item);
+  if (p == null) return false;
+  if (price === '저렴') return p <= 10000;
+  if (price === '중간') return p > 10000 && p <= 20000;
+  if (price === '고급') return p > 20000;
+  return true;
 }

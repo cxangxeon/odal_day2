@@ -32,3 +32,43 @@ input, select, button {
   border: 1px solid #aaa;
   background-color: #f9f9f9;
 }
+
+/* ---- 경로 안내 카드 ---- */
+#routeInfo { border-radius: 12px; padding: 16px; max-width: 560px; border-color: #e5e7eb; }
+.route-heading { margin: 0 0 12px; font-size: 18px; }
+.route-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.route-tab { margin: 0; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 999px;
+  background: #fff; cursor: pointer; font-size: 13px; color: #374151; }
+.route-tab:hover { border-color: var(--c); }
+.route-tab.active { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, #fff); }
+.route-tab .best { color: #b45309; font-size: 12px; }
+.route-summary { background: #fff; border: 1px solid #e5e7eb; border-left: 5px solid var(--c);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.route-mode { font-size: 13px; color: #6b7280; }
+.route-time { font-size: 34px; font-weight: 700; line-height: 1.2; }
+.route-time small { font-size: 16px; font-weight: 500; margin-left: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { background: #f3f4f6; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: #374151; }
+.route-steps { list-style: none; margin: 0 0 12px; padding: 0 0 0 4px; }
+.route-steps li { position: relative; padding: 0 0 14px 22px; border-left: 3px solid var(--c); margin-left: 6px; }
+.route-steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.route-steps li::before { content: ''; position: absolute; left: -8px; top: 3px; width: 13px; height: 13px;
+  border-radius: 50%; background: #fff; border: 3px solid var(--c); }
+.step-title { font-size: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.step-end { font-weight: 600; }
+.step-meta { color: #6b7280; font-size: 12px; }
+.step-route { margin-top: 3px; font-size: 13px; color: #374151; }
+.step-route span { color: #9ca3af; }
+.line-badge { color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 600; }
+.walk-note { font-size: 14px; }
+.walk-note span { color: #6b7280; font-size: 12px; }
+.route-warn { color: #b45309; background: #fffbeb; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.route-detail { font-size: 13px; color: #374151; }
+.route-detail summary { cursor: pointer; color: #6b7280; }
+.route-detail table { margin-top: 6px; border-collapse: collapse; width: 100%; }
+.route-detail th { text-align: left; font-weight: 500; color: #6b7280; padding: 4px 8px 4px 0; width: 100px; }
+.route-detail td { padding: 4px 0; }
+.map-legend { display: flex; gap: 14px; font-size: 12px; color: #4b5563; margin: -4px 0 12px 2px; }
+.map-legend i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.step-click { cursor: pointer; }
+.step-click:hover .step-title { text-decoration: underline; }

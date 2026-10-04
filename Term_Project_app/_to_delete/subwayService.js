@@ -1,7 +1,7 @@
 // utils/subwayService.js
 import fetch from 'node-fetch';
-import dotenv from 'dotenv';
-dotenv.config();
+import './loadEnv.js';
+import { callPublicApi } from './publicApi.js';
 
 const SUBWAY_SERVICE_KEY = process.env.BUSAN_SUBWAY_SERVICE_KEY;
 const SUBWAY_BASE_URL = 'http://apis.data.go.kr/6260000/BusanMetroTimeTable'; // 예시: 실제 문서 확인 필요
@@ -16,11 +16,7 @@ export async function fetchSubwayTimeTable(stationId) {
   url.searchParams.append('stationId', stationId);
   // 기타 파라미터(요일 구분, 출발/도착 구분 등) 필요 시 추가
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`지하철 시간표 API 오류: ${res.status}`);
-  }
-  const data = await res.json();
+  const data = await callPublicApi(url, 'subwayService');
   // data.response.body.items.item 등 구조에 따라 반환
   return data.response?.body?.items?.item || [];
 }

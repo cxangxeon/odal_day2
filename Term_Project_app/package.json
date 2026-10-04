@@ -125,9 +125,10 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "check:tmap": "node scripts/check-tmap.js"
   },
-  "type" : "module",
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC"

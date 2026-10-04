@@ -43,6 +43,9 @@
         <option value="고급">고급</option>
       </select>
       <button id="filterBtn">필터 적용</button>
+      <button id="viewportBtn">현재 지도 화면에서 맛집 검색</button>
+      <label style="margin-left:8px;"><input type="checkbox" id="autoViewport"> 지도 이동/확대 시 자동 검색</label>
+      <span id="resultCount" style="margin-left:8px; color:#2563eb;"></span>
     </div>
 
     <!-- 지도 -->
@@ -54,6 +57,9 @@
     </div>
 
     <!-- 경로 안내 정보 표시 -->
+    <!-- 선택한 맛집 상세 정보 -->
+    <div id="restaurantInfo" class="section"></div>
+
     <div id="routeInfo" class="section"></div>
   </div>
    <script src="js/main.js"></script>

@@ -1,7 +1,7 @@
 // utils/busService.js
 import fetch from 'node-fetch';
-import dotenv from 'dotenv';
-dotenv.config();
+import './loadEnv.js';
+import { callPublicApi } from './publicApi.js';
 
 const BUS_SERVICE_KEY = process.env.BUSAN_BUS_SERVICE_KEY;
 const BUS_BASE_URL = 'http://apis.data.go.kr/6260000/BusanBIMS'; // 실제 endpoint base URL
@@ -24,11 +24,7 @@ export async function fetchNearbyBusStops(x, y, radius = 500) {
   url.searchParams.append('radius', radius.toString());
   // 기타 파라미터(페이지 등)가 필요하면 추가
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`버스 정류소 조회 API 오류: ${res.status}`);
-  }
-  const data = await res.json();
+  const data = await callPublicApi(url, 'busService');
   // 응답 구조: data.response.body.items.item 등 (문서 확인 필요)
   return data.response?.body?.items?.item || [];
 }
@@ -41,11 +37,7 @@ export async function fetchBusArrival(stationId) {
   const url = new URL(`${BUS_BASE_URL}/getBusArrival`);
   url.searchParams.append('ServiceKey', BUS_SERVICE_KEY);
   url.searchParams.append('stationId', stationId);
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`버스 도착정보 API 오류: ${res.status}`);
-  }
-  const data = await res.json();
+  const data = await callPublicApi(url, 'busService');
   return data.response?.body?.items?.item || [];
 }
 
