@@ -72,3 +72,24 @@ input, select, button {
 .map-legend i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 .step-click { cursor: pointer; }
 .step-click:hover .step-title { text-decoration: underline; }
+
+/* ---- 출발지 입력 / 마커 ---- */
+.origin-wrap { position: relative; display: inline-block; }
+#originAddress { width: 320px; }
+.origin-suggest { display: none; position: absolute; left: 0; top: 100%; z-index: 1000; width: 100%;
+  margin: 2px 0 0; padding: 0; list-style: none; background: #fff; border: 1px solid #d1d5db;
+  border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.12); overflow: hidden; }
+.origin-suggest li { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+.origin-suggest li:last-child { border-bottom: 0; }
+.origin-suggest li:hover { background: #eff6ff; }
+.origin-suggest li span { display: block; color: #6b7280; font-size: 12px; margin-top: 1px; }
+
+.origin-marker { position: relative; width: 20px; height: 20px; }
+.origin-dot { position: absolute; inset: 3px; border-radius: 50%; background: #2563eb; border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.origin-pulse { position: absolute; inset: -10px; border-radius: 50%; background: rgba(37,99,235,.25);
+  animation: originPulse 1.8s ease-out infinite; }
+.origin-label { position: absolute; left: 50%; top: -26px; transform: translateX(-50%); white-space: nowrap;
+  background: #2563eb; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+@keyframes originPulse { 0% { transform: scale(.5); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }

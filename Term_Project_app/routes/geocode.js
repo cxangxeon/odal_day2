@@ -1,8 +1,20 @@
 // routes/geocode.js
 import express from 'express';
-import { geocodeAddress } from '../utils/geocode.js';
+import { geocodeAddress, searchPlaces } from '../utils/geocode.js';
 
 const router = express.Router();
+
+/** GET /api/geocode/search?query=... → 러프한 입력에 대한 후보 목록 [{name,address,x,y}] */
+router.get('/search', async (req, res) => {
+  try {
+    const query = String(req.query.query || '').trim();
+    if (!query) return res.json([]);
+    return res.json(await searchPlaces(query));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: '장소 검색 실패', details: err.message });
+  }
+});
 
 /**
  * GET /api/geocode?address=...

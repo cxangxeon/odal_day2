@@ -25,6 +25,17 @@ function clearMarkers() {
 }
 
 function addSimpleMarker(latlng, title) {
+  // 출발지는 기본 핀과 확실히 구별되는 펄스 마커로 표시
+  if (title === '출발지') {
+    const ov = new kakao.maps.CustomOverlay({
+      map, position: latlng, yAnchor: 0.5, xAnchor: 0.5, zIndex: 10,
+      content: `<div class="origin-marker" title="내 위치(출발지)">
+        <span class="origin-pulse"></span><span class="origin-dot"></span>
+        <span class="origin-label">출발</span></div>`
+    });
+    currentMarkers.push(ov);
+    return;
+  }
   const marker = new kakao.maps.Marker({
     map: map,
     position: latlng,
@@ -173,33 +184,115 @@ function addRestaurantMarker(latlng, title, itemData) {
   });
 }
 
+// ---------- 출발지 입력: 러프한 검색 + 후보 선택 + 현위치 ----------
+function setOriginStatus(msg, isError = false) {
+  const el = document.getElementById('originStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#b91c1c' : '#2563eb';
+}
+
+function applyOrigin(x, y, label) {
+  originCoords = { x, y }; // x=경도, y=위도
+  clearMarkers();
+  const originLatLng = new kakao.maps.LatLng(y, x);
+  addSimpleMarker(originLatLng, '출발지');
+  autoSearchPausedUntil = Date.now() + 1500;
+  map.setLevel(4);
+  map.setCenter(originLatLng);
+  hideOriginSuggestions();
+  setOriginStatus(`📍 출발지: ${label}`);
+}
+
+let originCandidates = [];
+function hideOriginSuggestions() {
+  const box = document.getElementById('originSuggest');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+}
+
+function showOriginSuggestions(list) {
+  const box = document.getElementById('originSuggest');
+  if (!box) return;
+  originCandidates = list;
+  if (!list.length) { hideOriginSuggestions(); return; }
+  box.innerHTML = list.map((c, i) => `<li data-i="${i}">
+      <b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.address || '')}</span></li>`).join('');
+  box.style.display = 'block';
+}
+
+async function fetchCandidates(q) {
+  const res = await fetch(`/api/geocode/search?query=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error(`장소 검색 응답 상태 ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
 async function setOrigin() {
   const addr = document.getElementById('originAddress').value.trim();
   if (!addr) {
-    alert('출발지 주소를 입력하세요.');
+    setOriginStatus('출발지를 입력하세요. (예: 부산대 앞, 서면역, 사상구 학장동)', true);
     return;
   }
   try {
-    const res = await fetch(`/api/geocode?address=${encodeURIComponent(addr)}`);
-    if (!res.ok) {
-      throw new Error(`Geocode API 응답 상태 ${res.status}`);
-    }
-    const data = await res.json();
-    if (data.error) {
-      alert('출발지 변환 실패: ' + data.error);
+    setOriginStatus('검색 중...');
+    const list = await fetchCandidates(addr);
+    if (!list.length) {
+      setOriginStatus('찾을 수 없어요. 건물/역 이름이나 동 이름으로 다시 입력해 보세요.', true);
       return;
     }
-    originCoords = { x: data.x, y: data.y }; // x=경도, y=위도
-    clearMarkers();
-    const originLatLng = new kakao.maps.LatLng(originCoords.y, originCoords.x);
-    addSimpleMarker(originLatLng, '출발지');
-    autoSearchPausedUntil = Date.now() + 1500;
-    map.setCenter(originLatLng);
-    alert(`출발지 설정됨: (${data.x.toFixed(6)}, ${data.y.toFixed(6)})`);
+    // 첫 번째 후보로 바로 설정하고, 후보가 여럿이면 목록에서 바꿀 수 있게 보여준다
+    applyOrigin(list[0].x, list[0].y, list[0].name);
+    if (list.length > 1) showOriginSuggestions(list);
   } catch (err) {
     console.error(err);
-    alert('출발지 설정 오류: ' + err.message);
+    setOriginStatus('출발지 설정 오류: ' + err.message, true);
   }
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    setOriginStatus('이 브라우저는 현재 위치를 지원하지 않습니다.', true);
+    return;
+  }
+  setOriginStatus('현재 위치 확인 중...');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('originAddress').value = '현재 위치';
+      applyOrigin(pos.coords.longitude, pos.coords.latitude, '현재 위치');
+    },
+    err => setOriginStatus('현재 위치를 가져오지 못했습니다: ' + err.message, true),
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
+function setupOriginInput() {
+  const input = document.getElementById('originAddress');
+  const box = document.getElementById('originSuggest');
+  if (!input || !box) return;
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { hideOriginSuggestions(); return; }
+    timer = setTimeout(async () => {
+      try { showOriginSuggestions(await fetchCandidates(q)); } catch (e) { /* 입력 중 오류는 무시 */ }
+    }, 300);
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); setOrigin(); }
+    if (e.key === 'Escape') hideOriginSuggestions();
+  });
+  box.addEventListener('click', e => {
+    const li = e.target.closest('li[data-i]');
+    if (!li) return;
+    const c = originCandidates[Number(li.dataset.i)];
+    input.value = c.name;
+    applyOrigin(c.x, c.y, c.name);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#originAddress, #originSuggest')) hideOriginSuggestions();
+  });
 }
 
 async function showNearbyRestaurants() {
@@ -524,6 +617,8 @@ window.onload = () => {
   initMap();
   const setBtn = document.getElementById('setOriginBtn');
   if (setBtn) setBtn.addEventListener('click', setOrigin);
+  document.getElementById('useLocationBtn')?.addEventListener('click', useCurrentLocation);
+  setupOriginInput();
   const showBtn = document.getElementById('showRestaurantsBtn');
   if (showBtn) showBtn.addEventListener('click', showNearbyRestaurants);
   document.getElementById('filterBtn')?.addEventListener('click', applyFilter);
