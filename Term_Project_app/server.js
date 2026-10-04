@@ -33,3 +33,6 @@ app.use('/api/route', routeRouter);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// Vercel 배포용: 서버리스 함수로 앱을 내보낸다 (로컬 npm start는 위 listen 그대로 사용)
+export default app;
